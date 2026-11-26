@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="th" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PHANTOM — Key Authentication</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Chakra Petch & Orbitron for geometric futuristic display, Noto Sans Thai & Noto Sans Arabic for multilingual support -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=JetBrains+Mono:wght@500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            phantom: {
+              bg: '#0c0c0e',
+              surface: '#141418',
+              dropdown: '#1a1a1f',
+              dropdownHover: '#24242b',
+              border: '#26262d',
+              borderFocus: '#4a4a55',
+              error: '#b55454',
+              errorBorder: '#9e4343',
+              white: '#f2f2f4',
+              muted: '#6b6b73',
+              subtle: '#4a4a52'
+            }
+          },
+          fontFamily: {
+            display: ['"Chakra Petch"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+            sans: ['"Noto Sans Thai"', '"Noto Sans Arabic"', 'sans-serif']
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* Base Page & Custom Subtle Geometric Background Pattern */
+    body {
+      background-color: #0b0b0d;
+      color: #f2f2f4;
+      font-family: 'Noto Sans Thai', 'Noto Sans Arabic', sans-serif;
+      overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Subtle dark tactical chevron/geometric background inspired by the screenshot */
+    .bg-phantom-pattern {
+      background-color: #0c0c0e;
+      background-image: 
+        radial-gradient(circle at 50% 34%, rgba(255, 255, 255, 0.045) 0%, rgba(12, 12, 14, 0) 52%),
+        repeating-linear-gradient(
+          0deg,
+          rgba(255, 255, 255, 0.012) 0px,
+          rgba(255, 255, 255, 0.012) 1px,
+          transparent 1px,
+          transparent 4px
+        );
+    }
+
+    /* Chamfered (45-degree angled top-left & bottom-right corners) Input Wrapper */
+    .chamfer-box {
+      position: relative;
+      background: #28282f; /* Default border color */
+      clip-path: polygon(
+        11px 0%,
+        100% 0%,
+        100% calc(100% - 11px),
+        calc(100% - 11px) 100%,
+        0% 100%,
+        0% 11px
+      );
+      padding: 1.5px;
+      transition: background-color 0.2s ease, transform 0.15s ease;
+    }
+
+    .chamfer-box:focus-within {
+      background: #52525e;
+    }
+
+    .chamfer-box.is-error {
+      background: #9c4343;
+    }
+
+    .chamfer-box-inner {
+      background: #141418;
+      clip-path: polygon(
+        10px 0%,
+        100% 0%,
+        100% calc(100% - 10px),
+        calc(100% - 10px) 100%,
+        0% 100%,
+        0% 10px
+      );
+    }
+
+    /* Chamfered Primary White CTA Button */
+    .chamfer-btn {
+      background: #f0f0f2;
+      color: #0c0c0e;
+      clip-path: polygon(
+        12px 0%,
+        100% 0%,
+        100% calc(100% - 12px),
+        calc(100% - 12px) 100%,
+        0% 100%,
+        0% 12px
+      );
+      transition: background-color 0.18s ease, transform 0.12s ease, opacity 0.2s ease;
+    }
+
+    .chamfer-btn:hover {
+      background: #ffffff;
+    }
+
+    .chamfer-btn:active {
+      transform: scale(0.985);
+      background: #dcdce0;
+    }
+
+    /* Subtle Ghost Glow */
+    .ghost-glow {
+      filter: drop-shadow(0 0 28px rgba(255, 255, 255, 0.14));
+    }
+
+    /* Shake animation for invalid key submission */
+    @keyframes subtleShake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-5px); }
+      40% { transform: translateX(5px); }
+      60% { transform: translateX(-3px); }
+      80% { transform: translateX(3px); }
+    }
+
+    .animate-shake {
+      animation: subtleShake 0.35s ease-in-out;
+    }
+
+    /* Smooth dropdown fade */
+    .dropdown-panel {
+      transform-origin: top right;
+      transition: opacity 0.16s ease, transform 0.16s ease;
+    }
+
+    [dir="rtl"] .dropdown-panel {
+      transform-origin: top left;
+    }
+
+    /* Custom subtle modal backdrop */
+    .modal-backdrop {
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+  </style>
+</head>
+<body class="bg-phantom-pattern min-h-screen flex flex-col justify-between selection:bg-white selection:text-black">
+
+  <!-- Background Faint Geometric Watermark Silhouette (matches subtle background shapes in screenshot) -->
+  <div class="fixed inset-0 pointer-events-none overflow-hidden flex items-center justify-center opacity-[0.035]" aria-hidden="true">
+    <svg viewBox="0 0 500 500" class="w-[680px] max-w-none h-auto fill-white">
+      <polygon points="0,120 250,210 500,120 460,290 250,240 40,290" />
+      <polygon points="90,340 170,290 250,340 330,290 410,340 410,430 330,380 250,430 170,380 90,430" />
+    </svg>
+  </div>
+
+  <!-- Top Navigation / Language Selector -->
+  <header class="relative z-30 w-full max-w-[440px] mx-auto px-5 pt-5 flex justify-end">
+    <div class="relative" id="langMenuContainer">
+      <button
+        id="langToggleBtn"
+        type="button"
+        aria-haspopup="true"
+        aria-expanded="false"
+        class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#16161a]/90 hover:bg-[#1e1e24] border border-white/[0.06] text-[#d4d4d8] text-xs font-medium transition-colors cursor-pointer"
+      >
+        <!-- Globe Icon -->
+        <svg class="w-4 h-4 text-[#a1a1aa]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
+          <path d="M2 12h20" />
+        </svg>
+        <span id="currentLangLabel">ไทย</span>
+      </button>
+
+      <!-- Language Dropdown Menu (Matches Screenshot 2) -->
+      <div
+        id="langDropdown"
+        role="menu"
+        class="dropdown-panel hidden opacity-0 scale-95 absolute end-0 mt-2 w-56 rounded-2xl bg-[#19191e] border border-white/[0.07] shadow-[0_18px_40px_rgba(0,0,0,0.75)] p-2 z-50"
+      >
+        <button
+          type="button"
+          data-lang="en"
+          class="lang-option w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-medium text-[#e4e4e7] hover:bg-[#23232a] transition-colors text-start"
+        >
+          <span>English</span>
+          <svg class="check-icon hidden w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          data-lang="th"
+          class="lang-option w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-medium text-white bg-[#23232a] hover:bg-[#282830] transition-colors text-start mt-0.5"
+        >
+          <span>ไทย</span>
+          <svg class="check-icon w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          data-lang="ar"
+          class="lang-option w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-medium text-[#e4e4e7] hover:bg-[#23232a] transition-colors text-end mt-0.5"
+          dir="rtl"
+        >
+          <span>العربية</span>
+          <svg class="check-icon hidden w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Centered Content -->
+  <main class="relative z-10 w-full max-w-[420px] mx-auto px-5 my-auto py-6 flex flex-col items-center">
+    
+    <!-- Mascot Vector Emblem (Custom SVG matching the PHANTOM skull-ghost mascot) -->
+    <div class="mb-5 select-none">
+      <svg
+        viewBox="0 0 200 215"
+        class="w-[148px] sm:w-[162px] h-auto ghost-glow"
+        aria-label="PHANTOM Mascot"
+      >
+        <defs>
+          <!-- Subtle vertical shading for depth -->
+          <linearGradient id="ghostBodyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#f7f7f9" />
+            <stop offset="100%" stop-color="#e5e5ea" />
+          </linearGradient>
+        </defs>
+
+        <!-- Main Ghost/Skull Silhouette with 4 pointed bottom waves -->
+        <path
+          d="M 100 16
+             C 52 16, 26 50, 26 98
+             L 26 196
+             L 50.6 173
+             L 75.3 196
+             L 100 173
+             L 124.6 196
+             L 149.3 173
+             L 174 196
+             L 174 98
+             C 174 50, 148 16, 100 16 Z"
+          fill="url(#ghostBodyGrad)"
+        />
+
+        <!-- Left Angled Polygonal Eye -->
+        <polygon
+          points="46,90 89,102 85,125 60,127 43,112"
+          fill="#34343a"
+        />
+        <!-- Left Eye Inner Shadow Facet -->
+        <polygon
+          points="46,90 67,96 60,127 43,112"
+          fill="#27272c"
+        />
+
+        <!-- Right Angled Polygonal Eye -->
+        <polygon
+          points="154,90 111,102 115,125 140,127 157,112"
+          fill="#34343a"
+        />
+        <!-- Right Eye Inner Shadow Facet -->
+        <polygon
+          points="154,90 133,96 140,127 157,112"
+          fill="#27272c"
+        />
+
+        <!-- Nasal Cavity Triangle -->
+        <polygon
+          points="100,121 90,137 97,135 100,132 103,135 110,137"
+          fill="#2c2c32"
+        />
+
+        <!-- Jagged Zigzag Mouth -->
+        <polyline
+          points="69,147 79,157 90,147 100,157 110,147 121,157 131,147"
+          fill="none"
+          stroke="#36363d"
+          stroke-width="6.5"
+          stroke-linecap="square"
+          stroke-linejoin="miter"
+        />
+      </svg>
+    </div>
+
+    <!-- Brand Wordmark -->
+    <h1
+      class="font-display font-bold text-[36px] sm:text-[40px] tracking-[0.16em] text-[#f2f2f4] leading-none text-center uppercase select-none"
+      style="margin-inline-end: -0.16em;"
+    >
+      PHANTOM
+    </h1>
+
+    <!-- Subtitle -->
+    <p
+      id="subtitleText"
+      class="mt-3 text-[13px] sm:text-[13.5px] text-[#6c6c75] font-medium tracking-wide text-center"
+    >
+      ไม่ต้องมีบัญชี ไม่ต้องมีรหัสผ่าน ใช้แค่คีย์
+    </p>
+
+    <!-- Authentication Form -->
+    <form id="authForm" class="w-full mt-9" novalidate>
+      <!-- Input Label with small white square bullet -->
+      <div class="flex items-center gap-2 mb-2.5 px-0.5">
+        <span class="inline-block w-[6px] h-[6px] bg-[#d4d4d8] shrink-0"></span>
+        <label
+          id="inputLabel"
+          for="keyInput"
+          class="text-[12.5px] font-medium text-[#7e7e87] select-none cursor-pointer"
+        >
+          คีย์เข้าใช้งาน
+        </label>
+      </div>
+
+      <!-- Chamfered Key Input Container -->
+      <div id="inputWrapper" class="chamfer-box w-full">
+        <div class="chamfer-box-inner flex items-center justify-between px-3.5 py-2.5 gap-2">
+          <input
+            id="keyInput"
+            type="text"
+            inputmode="text"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="characters"
+            spellcheck="false"
+            maxlength="19"
+            dir="ltr"
+            placeholder="PHTM-XXXX-XXXX-XXXX"
+            class="w-full bg-transparent text-[#f2f2f4] placeholder-[#4e4e57] font-mono text-[14.5px] sm:text-[15px] font-semibold tracking-[0.06em] focus:outline-none uppercase"
+          />
+
+          <!-- Inside-Right Paste Button -->
+          <button
+            id="pasteBtn"
+            type="button"
+            class="shrink-0 px-3.5 py-1.5 rounded-lg bg-[#222228] hover:bg-[#2c2c34] active:scale-95 text-[#a1a1aa] hover:text-white text-[12px] font-medium transition-all cursor-pointer"
+          >
+            วาง
+          </button>
+        </div>
+      </div>
+
+      <!-- Validation Error Message (Hidden by default, shown on invalid submit like Screenshot 2) -->
+      <div
+        id="errorContainer"
+        role="alert"
+        class="hidden items-center gap-2 mt-2.5 px-0.5 text-[#b85656] text-[12.5px] font-medium"
+      >
+        <span class="inline-block w-[6px] h-[6px] bg-[#b85656] shrink-0"></span>
+        <span id="errorText">กรอกคีย์ให้ครบ</span>
+      </div>
+
+      <!-- Primary Unlock CTA Button -->
+      <button
+        id="unlockBtn"
+        type="submit"
+        class="chamfer-btn w-full mt-5 h-[52px] flex items-center justify-center gap-2.5 font-bold text-[15.5px] tracking-wide cursor-pointer select-none"
+      >
+        <span id="unlockBtnText">ปลดล็อก</span>
+        <!-- Loading Spinner (hidden by default) -->
+        <svg id="loadingSpinner" class="hidden animate-spin w-5 h-5 text-[#0c0c0e]" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+          <path class="opacity-85" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+      </button>
+    </form>
+
+    <!-- Footer Helper Texts -->
+    <footer class="mt-6 text-center space-y-1.5">
+      <p id="footerReseller" class="text-[12.5px] text-[#787882] font-medium">
+        ยังไม่มีคีย์? <button type="button" id="contactResellerTrigger" class="text-[#8e8e98] hover:text-white underline decoration-white/20 underline-offset-4 transition-colors cursor-pointer">ติดต่อผู้ขายของคุณ</button>
+      </p>
+      <p id="footerTimerNote" class="text-[11.5px] text-[#4c4c54]">
+        เวลาของคุณจะเริ่มนับเมื่อเชื่อมต่อ
+      </p>
+    </footer>
+  </main>
+
+  <!-- Subtle Bottom Spacer for Mobile Viewport Balance -->
+  <div class="h-6"></div>
+
+  <!-- Toast Notification Banner (Non-intrusive feedback for Paste / Reseller info) -->
+  <div
+    id="toastBanner"
+    class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 translate-y-2 transition-all duration-200 px-4 py-2.5 rounded-xl bg-[#1d1d23] border border-white/10 text-[#e4e4e7] text-xs font-medium shadow-2xl flex items-center gap-2 whitespace-nowrap"
+  >
+    <span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+    <span id="toastMessage">วางคีย์เรียบร้อยแล้ว</span>
+  </div>
+
+  <!-- Unlocked Session Status Modal (Appears when a valid 16-char key is unlocked) -->
+  <div
+    id="unlockedModal"
+    class="hidden fixed inset-0 z-50 bg-black flex flex-col items-center justify-center overflow-hidden"
+  >
+    <!-- Full-screen Surprise Image (IMG_5467.jpeg) -->
+    <img
+      id="surpriseImage"
+      src="IMG_5467.jpeg"
+      alt="PHANTOM Unlocked"
+      class="w-full h-full object-contain sm:object-cover select-none"
+      onerror="handleMediaFallback('image')"
+    />
+
+    <!-- Hidden Video/Audio Player for video_1.mov sound track -->
+    <video
+      id="surpriseAudioPlayer"
+      src="video_1.mov"
+      playsinline
+      loop
+      preload="auto"
+      class="hidden"
+      onerror="handleMediaFallback('audio')"
+    ></video>
+
+    <!-- Subtle Top Bar Controls (Volume indicator + Close/Back button + Optional file loader if local files aren't in same folder) -->
+    <div class="fixed top-4 inset-x-4 z-50 flex items-center justify-between pointer-events-none">
+      <div class="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/70 border border-white/15 backdrop-blur-md text-xs font-mono text-white">
+        <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+        <span id="modalActiveKey">PHTM-XXXX-XXXX-XXXX</span>
+      </div>
+
+      <div class="pointer-events-auto flex items-center gap-2">
+        <!-- Quick Media Picker button in case browser sandbox needs manual file selection -->
+        <label
+          id="fallbackMediaPickerBtn"
+          for="customMediaInput"
+          class="hidden px-3 py-1.5 rounded-xl bg-black/70 hover:bg-black/90 border border-white/15 backdrop-blur-md text-xs text-white/80 hover:text-white cursor-pointer transition-colors"
+        >
+          เลือกไฟล์รูป/เสียง
+        </label>
+        <input
+          id="customMediaInput"
+          type="file"
+          accept="image/*,video/*,audio/*"
+          multiple
+          class="hidden"
+        />
+
+        <button
+          id="disconnectBtn"
+          type="button"
+          class="px-3.5 py-1.5 rounded-xl bg-black/75 hover:bg-black border border-white/20 backdrop-blur-md text-xs font-semibold text-white cursor-pointer transition-all active:scale-95"
+        >
+          <span id="disconnectBtnText">ปิด</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+// ... existing code ... -->
+    const unlockedModal = document.getElementById('unlockedModal');
+    const surpriseImage = document.getElementById('surpriseImage');
+    const surpriseAudioPlayer = document.getElementById('surpriseAudioPlayer');
+    const fallbackMediaPickerBtn = document.getElementById('fallbackMediaPickerBtn');
+    const customMediaInput = document.getElementById('customMediaInput');
+    const modalActiveKey = document.getElementById('modalActiveKey');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+    const disconnectBtnText = document.getElementById('disconnectBtnText');
+
+    let fallbackAudioCtx = null;
+    let fallbackOscInterval = null;
+
+    // Handle missing relative files in isolated preview sandboxes
+    function handleMediaFallback(type) {
+      fallbackMediaPickerBtn.classList.remove('hidden');
+      if (type === 'image') {
+        surpriseImage.src = 'https://placehold.co/900x1200/141418/f2f2f4?text=IMG_5467.jpeg';
+      }
+    }
+
+    // Allow user to load IMG_5467.jpeg / video_1.mov manually if needed
+    customMediaInput.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files || []);
+      files.forEach((file) => {
+        const objectUrl = URL.createObjectURL(file);
+        if (file.type.startsWith('image/')) {
+          surpriseImage.src = objectUrl;
+        } else if (file.type.startsWith('video/') || file.type.startsWith('audio/')) {
+          stopFallbackSynth();
+          surpriseAudioPlayer.src = objectUrl;
+          surpriseAudioPlayer.volume = 1.0;
+          surpriseAudioPlayer.play().catch(() => {});
+        }
+      });
+    });
+
+    // Synthesized loud screaming meme audio fallback ONLY if video_1.mov cannot be loaded by browser
+    function startFallbackSynth() {
+      try {
+        if (fallbackAudioCtx) return;
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        fallbackAudioCtx = new AudioCtx();
+        const playScreamingBurst = () => {
+          if (!fallbackAudioCtx || unlockedModal.classList.contains('hidden')) return;
+          const now = fallbackAudioCtx.currentTime;
+          const osc = fallbackAudioCtx.createOscillator();
+          const gain = fallbackAudioCtx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(520, now);
+          osc.frequency.exponentialRampToValueAtTime(1180, now + 0.18);
+          osc.frequency.exponentialRampToValueAtTime(640, now + 0.36);
+          osc.frequency.exponentialRampToValueAtTime(1320, now + 0.55);
+
+          gain.gain.setValueAtTime(0.35, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+
+          osc.connect(gain);
+          gain.connect(fallbackAudioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.62);
+        };
+        playScreamingBurst();
+        fallbackOscInterval = setInterval(playScreamingBurst, 700);
+      } catch (err) {}
+    }
+
+    function stopFallbackSynth() {
+      if (fallbackOscInterval) {
+        clearInterval(fallbackOscInterval);
+        fallbackOscInterval = null;
+      }
+      if (fallbackAudioCtx) {
+        fallbackAudioCtx.close().catch(() => {});
+        fallbackAudioCtx = null;
+      }
+    }
+
+    // Format key string into XXXX-XXXX-XXXX-XXXX (16 alphanumeric chars max)
+// ... existing code ... -->
+      // Update footer reseller line while keeping interactive button
+      footerReseller.innerHTML = `${t.noKeyPrefix} <button type="button" id="contactResellerTrigger" class="text-[#8e8e98] hover:text-white underline decoration-white/20 underline-offset-4 transition-colors cursor-pointer">${t.contactReseller}</button>`;
+      document.getElementById('contactResellerTrigger').addEventListener('click', () => {
+        showToast(translations[currentLang].toastReseller);
+      });
+
+      // Update modal close label
+      disconnectBtnText.textContent = lang === 'th' ? 'ปิด' : lang === 'ar' ? 'إغلاق' : 'Close';
+
+      // Highlight selected language option & show checkmark
+// ... existing code ... -->
+    // Form Submission & Validation
+    authForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const rawChars = keyInput.value.replace(/[^A-Z0-9]/g, '');
+
+      // Must contain full 16 characters (e.g., PHTM-XXXX-XXXX-XXXX)
+      if (rawChars.length < 16) {
+        showErrorState();
+        keyInput.focus();
+        return;
+      }
+
+      clearErrorState();
+
+      // Trigger audio playback directly inside the user click/submit event so browser autoplay allows full volume
+      surpriseAudioPlayer.currentTime = 0;
+      surpriseAudioPlayer.volume = 1.0;
+      const playPromise = surpriseAudioPlayer.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          // If video_1.mov is missing or blocked in sandbox, use Web Audio fallback
+          startFallbackSynth();
+        });
+      }
+
+      // Immediately show full-screen IMG_5467.jpeg surprise view
+      modalActiveKey.textContent = keyInput.value;
+      unlockedModal.classList.remove('hidden');
+    });
+
+    // Close Unlocked Modal & Stop Sound
+    function closeSurpriseModal() {
+      unlockedModal.classList.add('hidden');
+      surpriseAudioPlayer.pause();
+      surpriseAudioPlayer.currentTime = 0;
+      stopFallbackSynth();
+    }
+
+    disconnectBtn.addEventListener('click', closeSurpriseModal);
+  </script>
+</body>
+</html>
